@@ -10,34 +10,19 @@ def epsilon_gready(MAB,time=1000,epsilon=0.1, seed= SEED):
 
     Q = np.zeros(MAB.k)   # estimated rewards
     N = np.zeros(MAB.k)   # action counts
+    
+    rewards = np.zeros(time)
+    actions = np.zeros(time, dtype=int)
 
 
-
-
-
-
-
-def epsilon_greedy(env, T=1000, eps=0.1, seed=0):
-    """
-    Simple epsilon-greedy for a K-armed bandit.
-
-    env: bandit environment with env.k and env.step(a)
-    T:   time horizon
-    eps: exploration probability
-    """
-
-
-    rewards = np.zeros(T)
-    actions = np.zeros(T, dtype=int)
-
-    for t in range(T):
+    for t in range(time):
         # sample e ~ Uniform[0,1]
-        if rng.random() < eps:
-            a = rng.integers(env.k)     # random action
+        if rng.random() < epsilon:
+            a = rng.integers(MAB.k)     # random action
         else:
             a = np.argmax(Q)            # greedy action
 
-        _, r, _, _, _ = env.step(a)
+        _, r, _, _, _ = MAB.step(a)
 
         # update
         N[a] += 1
@@ -47,3 +32,15 @@ def epsilon_greedy(env, T=1000, eps=0.1, seed=0):
         rewards[t] = r
 
     return Q, N, actions, rewards
+
+
+
+
+
+
+
+
+
+
+
+
