@@ -84,6 +84,7 @@ class Bandits_four(Bandits):
         self.variances = np.array([1, 1, 3])
         self.state = gene
         self.random_state = random_state
+        self._step = 0
         np.random.seed(self.random_state)
 
     def reset(self):
@@ -111,3 +112,4 @@ class Bandits_four(Bandits):
     def get_optimal_expected_reward(self):
         return np.max(self.means[self.state])
         
+
