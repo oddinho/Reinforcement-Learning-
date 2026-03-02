@@ -12,7 +12,9 @@ class MountainEnv(gym.Env):
     def __init__(self, render_mode=None, backwards = False):
         self.window_size = 1200  # The size of the PyGame window
   
-        self.MAP = np.genfromtxt(os.path.join('mountain','envs','the_hill2_modified.txt'),float)
+        # Resolve data file relative to this module so cwd doesn't matter.
+        data_file = os.path.join(os.path.dirname(__file__), "the_hill2_modified.txt")
+        self.MAP = np.genfromtxt(data_file, float)
         self.height = self.MAP.shape[0]  # The height of the grid
         self.width = self.MAP.shape[1]  # The width of the grid
         self.graphics = np.expand_dims(self.MAP, axis = 2)
