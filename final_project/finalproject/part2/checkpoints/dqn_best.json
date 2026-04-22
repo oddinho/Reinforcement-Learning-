@@ -1,0 +1,70 @@
+{
+  "step": 15000,
+  "primary_metric": 121.13333333333333,
+  "baseline_mean_score_diff": 109.33333333333333,
+  "random_mean_score_diff": 148.66666666666666,
+  "baseline_matches": [
+    {
+      "seed": 0,
+      "steps": 1000,
+      "team_points": [
+        165,
+        65
+      ],
+      "score_diff": 100,
+      "reward_diff": 156.0
+    },
+    {
+      "seed": 1,
+      "steps": 1000,
+      "team_points": [
+        170,
+        46
+      ],
+      "score_diff": 124,
+      "reward_diff": 235.0
+    },
+    {
+      "seed": 2,
+      "steps": 1000,
+      "team_points": [
+        161,
+        57
+      ],
+      "score_diff": 104,
+      "reward_diff": 193.0
+    }
+  ],
+  "random_matches": [
+    {
+      "seed": 0,
+      "steps": 1000,
+      "team_points": [
+        150,
+        17
+      ],
+      "score_diff": 133,
+      "reward_diff": 340.0
+    },
+    {
+      "seed": 1,
+      "steps": 1000,
+      "team_points": [
+        165,
+        9
+      ],
+      "score_diff": 156,
+      "reward_diff": 400.0
+    },
+    {
+      "seed": 2,
+      "steps": 1000,
+      "team_points": [
+        168,
+        11
+      ],
+      "score_diff": 157,
+      "reward_diff": 401.0
+    }
+  ]
+}
