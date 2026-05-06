@@ -1,169 +1,110 @@
 # Deep RL Progress
 
-## 2026-05-06 Reset
+Goal: train a neural target selector that beats both nearest-item BFS and the
+current deterministic `rollout_gated` agent on average.
 
-The previous target-selection PPO became too complex again: CNN board encoder,
-behavior cloning, and many engineered route features made it harder to reason
-about what PPO was actually learning.
+## Current Direction
 
-The current direction scraps that implementation and resets to a simpler PPO
-model inspired by the 2017 PPO paper:
+Reset date: `2026-05-06`
+
+The previous target-selection PPO became too complex: CNN board encoder,
+behavior cloning, PPO-time teacher anchoring, and many route-inspired features.
+That model produced useful results, but it was hard to explain and reason
+about.
+
+The active implementation is now a simpler PPO target selector inspired by the
+plain architecture used in the PPO paper:
 
 ```text
 reachable target features -> Linear(64) -> Tanh -> Linear(64) -> Tanh -> logit
 ```
 
-Training is now separate from model/inference code:
+The model chooses a target item. BFS then converts that target into the first
+shortest-path movement action.
 
-- `target_selection_ppo_mlp.py`: model, target features, BFS target-to-action.
-- `train_target_selection_ppo.py`: PPO training and evaluation only.
+## Current Files
 
-The new default training opponent mix is:
+- `target_selection_ppo_mlp.py`
+  - Model, target features, BFS target-to-action logic.
+- `train_target_selection_ppo.py`
+  - PPO rollout collection, updates, checkpointing, and evaluation.
+- `record_target_selection_ppo.py`
+  - Records replay JSON files from PPO checkpoints.
+- `deterministic_agents/bfs_agent.py`
+  - Nearest-item BFS baseline.
+- `deterministic_agents/rollout_gated_agent.py`
+  - Strong deterministic baseline and current leaderboard candidate.
+- `recordings/`
+  - Local replay outputs. Ignored by git except `.gitkeep`.
+- `checkpoints/`
+  - Local model checkpoints. Ignored by git except `.gitkeep`.
+- `training_logs/`
+  - Local long-run logs. Ignored by git except `.gitkeep`.
+
+## Current Training Setup
+
+Default opponent mix:
 
 ```text
 bfs:0.5,rollout_gated:0.5
 ```
 
-The checkpoint name also changed to avoid confusing it with the older CNN/BC
-checkpoint:
+Default checkpoint:
 
 ```text
 checkpoints/target_selection_ppo_mlp_latest.pt
 ```
 
-The older results below are kept as context, but they are no longer from the
-active architecture.
+Recommended training command from `final_project/finalproject/part2`:
 
-Goal: train a neural target ranker that beats both nearest-item BFS and the
-current deterministic `rollout_gated` submission agent on average, not just on
-one lucky seed.
-
-## Current Baselines
-
-- `deterministic_agents/bfs_agent.py`: shortest path to the nearest item.
-- `deterministic_agents/rollout_gated_agent.py`: BFS plus route-aware switching. This is the
-  current strong hand-written baseline and the leaderboard candidate.
-
-Any learned agent should be evaluated against both. Beating BFS alone is not
-enough anymore.
-
-## Current Learning Approach
-
-The PPO problem is intentionally narrowed:
-
-```text
-neural network chooses target item -> BFS executes shortest path
+```powershell
+python .\train_target_selection_ppo.py --iterations 30 --rollout-steps 3000 --ppo-epochs 4 --batch-size 256 --learning-rate 2.5e-4 --entropy-coef 0.01 --opponent-mix bfs:0.5,rollout_gated:0.5 --eval-opponents bfs rollout_gated --eval-seeds 0 1 2 3 4 --checkpoint-path .\checkpoints\target_selection_ppo_mlp_latest.pt
 ```
 
-This makes the learning problem target selection rather than movement. On a
-known grid, BFS already solves movement optimally, so asking PPO to rediscover
-pathfinding wastes samples.
+Evaluate a checkpoint:
 
-## Active Experiment
-
-Current run:
-
-```text
-rollout-gated behavior cloning -> PPO against bfs/rollout_gated mix
+```powershell
+python .\train_target_selection_ppo.py --eval-only --checkpoint-path .\checkpoints\target_selection_ppo_mlp_latest.pt --eval-opponents bfs rollout_gated --eval-seeds 0 1 2 3 4 5 6 7 8 9 --eval-steps 1000
 ```
 
-The behavior-cloning phase teaches the model the rollout-gated target choices.
-PPO should then improve from that warm start.
+Record a replay:
 
-Early signal from the active run:
-
-- BC accuracy reached about `0.986`, so the model can imitate the teacher.
-- PPO iteration 3 was slightly above BFS on the 5-seed eval.
-- Policy entropy became very low, so the model may be too deterministic too
-  early.
-
-## Current Results
-
-Active run command shape:
-
-```text
-pretrain_steps=10000, pretrain_epochs=5, iterations=20,
-rollout_steps=3000, learning_rate=1e-4, entropy_coef=0.02,
-opponent_mix=bfs:0.7,rollout_gated:0.3
+```powershell
+python .\record_target_selection_ppo.py --checkpoint-path .\checkpoints\target_selection_ppo_mlp_latest.pt --opponent bfs --seed 0 --output .\recordings\target_selection_ppo_mlp_vs_bfs_seed0.json
 ```
 
-Behavior cloning:
+## Success Criterion
 
-- collected `9982` target-choice examples
-- final BC loss `0.0532`
-- final BC accuracy `0.986`
-- final BC entropy `0.060`
+A learned model is only worth packaging if it has positive mean score
+difference against both:
 
-The training run finished at PPO iteration 20. Final 5-seed eval from the
-training log:
+- BFS over at least 10 fixed seeds
+- rollout_gated over at least 10 fixed seeds
 
-| Opponent | Seeds | Mean score diff | Min | Max |
-| --- | --- | ---: | ---: | ---: |
-| BFS | `0..4` | `+6.60` | `-9` | `+39` |
-| rollout_gated | `0..4` | `+3.40` | `-5` | `+10` |
-| baseline | `0..4` | `+95.00` | `+77` | `+106` |
+If that holds, test more seeds before replacing the deterministic submission
+agent.
 
-Follow-up eval-only run over 10 seeds:
+## Archived Result
+
+The older CNN/behavior-cloning PPO checkpoint did reach positive average
+performance over a short eval:
 
 | Opponent | Seeds | Mean score diff | Min | Max |
 | --- | --- | ---: | ---: | ---: |
 | BFS | `0..9` | `+6.10` | `-9` | `+39` |
 | rollout_gated | `0..9` | `+2.70` | `-8` | `+11` |
 
-Interpretation:
+This result is kept as context only. It is not the active architecture anymore.
 
-- The model now beats BFS on average over the 10-seed check.
-- It also beats `rollout_gated` on average over the same seeds, which clears
-  the first useful threshold.
-- The margin is still small against `rollout_gated`, so this should be tested
-  on more seeds before replacing the deterministic submission agent.
-- The low entropy means the policy quickly becomes near-deterministic after
-  BC, so future runs should either keep more exploration or use a weaker BC
-  anchor rather than fully locking onto the teacher.
+## Submission Note
 
-## Changes Added For Next Run
+Do not commit packaged agents or generated weights. Zip files, checkpoints,
+recordings, logs, and generated reports are ignored by git.
 
-- Save a separate best checkpoint chosen by the weakest mean score difference
-  across eval opponents.
-- Add optional PPO-time BC anchoring with `--bc-anchor-coef`.
-
-The best-checkpoint rule matters because baseline games are easy. The model
-should be selected by performance against the hard opponents: BFS and
-rollout-gated.
-
-## Next Runs
-
-Recommended command from `final_project/finalproject/part2`:
-
-```powershell
-python .\train_target_selection_ppo.py --pretrain-steps 10000 --pretrain-epochs 5 --iterations 30 --rollout-steps 3000 --batch-size 256 --ppo-epochs 4 --learning-rate 1e-4 --entropy-coef 0.03 --bc-anchor-coef 0.01 --opponent-mix bfs:0.6,rollout_gated:0.4 --eval-opponents bfs rollout_gated --eval-seeds 0 1 2 3 4 5 6 7 8 9 --eval-steps 1000 --checkpoint-path .\checkpoints\target_selection_ppo_bc_anchor_latest.pt
-```
-
-If entropy stays below about `0.05` and eval does not improve, use one of these
-instead of increasing training time blindly:
-
-- increase `--entropy-coef` to `0.05`
-- reduce `--bc-anchor-coef` to `0.003`
-- increase opponent pressure to `bfs:0.5,rollout_gated:0.5`
-
-## Success Criterion
-
-A candidate is worth packaging only if it has positive mean score difference
-against both:
-
-- BFS over at least 10 fixed seeds
-- rollout-gated over at least 10 fixed seeds
-
-Then record a replay for inspection and package:
+If a PPO model becomes worth submitting, package locally as:
 
 ```text
 agent.py
 config.yaml
 weights/model.pth
-```
-
-Checkpoint eval command:
-
-```powershell
-python .\train_target_selection_ppo.py --eval-only --checkpoint-path .\checkpoints\target_selection_ppo_bc_latest.pt --eval-opponents bfs rollout_gated --eval-seeds 0 1 2 3 4 5 6 7 8 9 --eval-steps 1000
 ```
