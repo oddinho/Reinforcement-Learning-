@@ -17,7 +17,10 @@ ACTION_DIM = 4
 MAP_HEIGHT = 16
 MAP_WIDTH = 16
 MAX_DISTANCE = MAP_HEIGHT + MAP_WIDTH
-FEATURE_DIM = 13
+FEATURE_DIM = 23
+GLOBAL_FEATURE_DIM = 19
+ROUTE_DEPTH = 3
+ROUTE_DECAY = 0.7
 
 ACTIONS = np.array(
     [
@@ -33,6 +36,7 @@ ACTIONS = np.array(
 @dataclass
 class TargetCandidates:
     features: np.ndarray
+    global_features: np.ndarray
     targets: list[tuple[int, int]]
     first_actions: list[int | None]
 
@@ -46,6 +50,18 @@ def get_state_parts(observation):
         tuple(int(v) for v in pos) for pos in np.argwhere(tile_map == 2)
     ]
     return tile_map, self_pos, opponent_pos, item_positions
+
+
+def get_score_context(observation):
+    team_points = np.asarray(observation["team_points"], dtype=np.float32)
+    steps = float(np.asarray(observation["steps"]))
+    score_diff = float(team_points[0] - team_points[1])
+    score_diff_norm = float(np.clip(score_diff / 50.0, -1.0, 1.0))
+    behind = 1.0 if score_diff < 0.0 else 0.0
+    steps_norm = float(np.clip(steps / 1000.0, 0.0, 1.0))
+    steps_remaining_norm = 1.0 - steps_norm
+    urgent_behind = behind * steps_norm
+    return score_diff_norm, behind, steps_norm, steps_remaining_norm, urgent_behind
 
 
 def valid_neighbors(tile_map, pos):
@@ -94,8 +110,97 @@ def count_cluster(item_distance_maps, target, items, radius):
     return sum(1 for item in items if distances.get(item, 10_000) <= radius)
 
 
+def route_value(target, items, item_distance_maps, depth=ROUTE_DEPTH, decay=ROUTE_DECAY):
+    """Cheap feature for whether a target opens a short follow-up route."""
+
+    current = target
+    remaining = set(items)
+    remaining.discard(target)
+    value = 0.0
+
+    for route_step in range(depth):
+        distances = item_distance_maps[current]
+        reachable = [
+            (distances[item], item)
+            for item in remaining
+            if item in distances
+        ]
+        if not reachable:
+            break
+        leg_distance, next_item = min(reachable)
+        value += (decay ** route_step) / float(1 + leg_distance)
+        remaining.remove(next_item)
+        current = next_item
+
+    return float(np.clip(value / 1.5, 0.0, 1.0))
+
+
+def build_global_features(
+    self_pos,
+    opponent_pos,
+    items,
+    own_target_distances,
+    opponent_target_distances,
+    race_margins,
+    route_values,
+    cluster3_values,
+    cluster5_values,
+    score_diff_norm,
+    behind,
+    steps_norm,
+    steps_remaining_norm,
+    urgent_behind,
+):
+    """State-level critic input.
+
+    The actor still receives per-target rows. The critic gets these global
+    scalars so its value estimate can distinguish easy/hard states without
+    reconstructing that information from mean/max/min pooled target rows.
+    """
+
+    own_arr = np.asarray(own_target_distances, dtype=np.float32)
+    opponent_arr = np.asarray(opponent_target_distances, dtype=np.float32)
+    race_arr = np.asarray(race_margins, dtype=np.float32)
+    route_arr = np.asarray(route_values, dtype=np.float32)
+    cluster3_arr = np.asarray(cluster3_values, dtype=np.float32)
+    cluster5_arr = np.asarray(cluster5_values, dtype=np.float32)
+    contested = np.abs(race_arr) <= 2.0
+    own_favored = race_arr >= 0.0
+    return np.asarray(
+        [
+            (float(self_pos[0]) / (MAP_HEIGHT - 1)) * 2.0 - 1.0,
+            (float(self_pos[1]) / (MAP_WIDTH - 1)) * 2.0 - 1.0,
+            (float(opponent_pos[0]) / (MAP_HEIGHT - 1)) * 2.0 - 1.0,
+            (float(opponent_pos[1]) / (MAP_WIDTH - 1)) * 2.0 - 1.0,
+            min(len(items), 32) / 32.0,
+            normalized_distance(float(np.min(own_arr))),
+            normalized_distance(float(np.mean(own_arr))),
+            normalized_distance(float(np.min(opponent_arr))),
+            normalized_distance(float(np.mean(opponent_arr))),
+            float(np.mean(contested.astype(np.float32))),
+            float(np.mean(own_favored.astype(np.float32))),
+            float(np.max(route_arr)),
+            min(float(np.max(cluster3_arr)), 10.0) / 10.0,
+            min(float(np.max(cluster5_arr)), 16.0) / 16.0,
+            score_diff_norm,
+            behind,
+            steps_norm,
+            steps_remaining_norm,
+            urgent_behind,
+        ],
+        dtype=np.float32,
+    )
+
+
 def build_target_candidates(observation):
     tile_map, self_pos, opponent_pos, item_positions = get_state_parts(observation)
+    (
+        score_diff_norm,
+        behind,
+        steps_norm,
+        steps_remaining_norm,
+        urgent_behind,
+    ) = get_score_context(observation)
     own_distances, first_actions = bfs_distances_and_first_actions(tile_map, self_pos)
     opponent_distances, _ = bfs_distances_and_first_actions(tile_map, opponent_pos)
     items = [item for item in item_positions if item in own_distances]
@@ -111,6 +216,12 @@ def build_target_candidates(observation):
     features = []
     targets = []
     target_first_actions = []
+    own_target_distances = []
+    opponent_target_distances = []
+    race_margins = []
+    route_values = []
+    cluster3_values = []
+    cluster5_values = []
     for item in items:
         own_distance = own_distances[item]
         opponent_distance = opponent_distances.get(item)
@@ -120,6 +231,22 @@ def build_target_candidates(observation):
 
         cluster3 = count_cluster(item_distance_maps, item, items, radius=3)
         cluster5 = count_cluster(item_distance_maps, item, items, radius=5)
+        local_route_value = route_value(item, items, item_distance_maps)
+        opponent_distance_feature = (
+            opponent_distance if opponent_distance is not None else MAX_DISTANCE
+        )
+        contested = 1.0 if abs(race_margin) <= 2.0 else 0.0
+        own_favored = 1.0 if race_margin >= 0.0 else 0.0
+        lost_race = 1.0 if race_margin < -1.0 else 0.0
+        route_if_own_favored = local_route_value * own_favored
+        route_if_lost = local_route_value * lost_race
+        abandon_pressure = lost_race * (0.5 + 0.5 * behind)
+        own_target_distances.append(float(own_distance))
+        opponent_target_distances.append(float(opponent_distance_feature))
+        race_margins.append(float(race_margin))
+        route_values.append(float(local_route_value))
+        cluster3_values.append(float(cluster3))
+        cluster5_values.append(float(cluster5))
         y, x = item
         row = [
             (float(y) / (MAP_HEIGHT - 1)) * 2.0 - 1.0,
@@ -134,14 +261,42 @@ def build_target_candidates(observation):
             1.0 if own_distance == nearest_distance else 0.0,
             min(float(cluster3), 10.0) / 10.0,
             min(float(cluster5), 16.0) / 16.0,
+            local_route_value,
             item_count_norm,
+            contested,
+            own_favored,
+            lost_race,
+            route_if_own_favored,
+            route_if_lost,
+            score_diff_norm,
+            behind,
+            urgent_behind,
+            abandon_pressure,
         ]
         features.append(row)
         targets.append(item)
         target_first_actions.append(first_actions[item])
 
+    global_features = build_global_features(
+        self_pos=self_pos,
+        opponent_pos=opponent_pos,
+        items=items,
+        own_target_distances=own_target_distances,
+        opponent_target_distances=opponent_target_distances,
+        race_margins=race_margins,
+        route_values=route_values,
+        cluster3_values=cluster3_values,
+        cluster5_values=cluster5_values,
+        score_diff_norm=score_diff_norm,
+        behind=behind,
+        steps_norm=steps_norm,
+        steps_remaining_norm=steps_remaining_norm,
+        urgent_behind=urgent_behind,
+    )
+
     return TargetCandidates(
         features=np.asarray(features, dtype=np.float32),
+        global_features=global_features,
         targets=targets,
         first_actions=target_first_actions,
     )
@@ -166,7 +321,7 @@ class TargetSelectionMLP(nn.Module):
             nn.Tanh(),
             nn.Linear(hidden_dim, 1),
         )
-        critic_input_dim = self.feature_dim * 3 + 1
+        critic_input_dim = self.feature_dim * 3 + GLOBAL_FEATURE_DIM + 1
         self.critic = nn.Sequential(
             nn.Linear(critic_input_dim, hidden_dim),
             nn.Tanh(),
@@ -175,7 +330,7 @@ class TargetSelectionMLP(nn.Module):
             nn.Linear(hidden_dim, 1),
         )
 
-    def forward(self, features, valid_mask):
+    def forward(self, features, valid_mask, global_features):
         logits = self.actor(features).squeeze(-1)
         logits = logits.masked_fill(~valid_mask, -1.0e9)
 
@@ -188,7 +343,7 @@ class TargetSelectionMLP(nn.Module):
         min_features = features.masked_fill(~mask, 1.0e9).min(dim=1).values
         count_feature = (counts / 32.0).clamp(max=1.0)
         summary = torch.cat(
-            [mean_features, max_features, min_features, count_feature],
+            [mean_features, max_features, min_features, global_features, count_feature],
             dim=1,
         )
         values = self.critic(summary).squeeze(-1)
@@ -197,19 +352,20 @@ class TargetSelectionMLP(nn.Module):
 
 def make_single_batch(candidates, device):
     features = torch.from_numpy(candidates.features[None, :, :]).to(device)
+    global_features = torch.from_numpy(candidates.global_features[None, :]).to(device)
     valid_mask = torch.ones(
         (1, candidates.features.shape[0]),
         dtype=torch.bool,
         device=device,
     )
-    return features, valid_mask
+    return features, valid_mask, global_features
 
 
 @torch.no_grad()
 def select_target_action(model, candidates, device, sample):
     model.eval()
-    features, valid_mask = make_single_batch(candidates, device)
-    logits, values = model(features, valid_mask)
+    features, valid_mask, global_features = make_single_batch(candidates, device)
+    logits, values = model(features, valid_mask, global_features)
     dist = Categorical(logits=logits)
     if sample:
         action_index = dist.sample()

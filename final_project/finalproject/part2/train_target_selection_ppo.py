@@ -29,6 +29,7 @@ from deterministic_agents import bfs_agent, rollout_gated_agent
 from target_selection_ppo_mlp import (
     ACTION_DIM,
     FEATURE_DIM,
+    GLOBAL_FEATURE_DIM,
     DeterministicTargetSelectionAgent,
     TargetSelectionMLP,
     build_target_candidates,
@@ -39,12 +40,13 @@ from target_selection_ppo_mlp import (
 
 
 CHECKPOINT_DIR = PART2_ROOT / "checkpoints"
-DEFAULT_CHECKPOINT = CHECKPOINT_DIR / "target_selection_ppo_mlp_latest.pt"
+DEFAULT_CHECKPOINT = CHECKPOINT_DIR / "target_selection_ppo_mlp_abandon_latest.pt"
 
 
 @dataclass
 class Transition:
     features: np.ndarray
+    global_features: np.ndarray
     action_index: int
     log_prob: float
     value: float
@@ -96,6 +98,22 @@ def reward_diff(raw_reward):
     return float(reward[0] - reward[1])
 
 
+def score_delta_diff(previous_info, next_info):
+    previous_points = np.asarray(previous_info["state"].team_points, dtype=np.float32)
+    next_points = np.asarray(next_info["state"].team_points, dtype=np.float32)
+    previous_diff = float(previous_points[0] - previous_points[1])
+    next_diff = float(next_points[0] - next_points[1])
+    return next_diff - previous_diff
+
+
+def training_reward(raw_reward, previous_info, next_info, reward_mode):
+    if reward_mode == "env_diff":
+        return reward_diff(raw_reward)
+    if reward_mode == "score_delta":
+        return score_delta_diff(previous_info, next_info)
+    raise ValueError(f"Unknown reward mode: {reward_mode}")
+
+
 def collect_rollout(model, args, device, rng, iteration):
     env = CollectorGymEnv(numpy_output=True)
     obs = None
@@ -139,7 +157,7 @@ def collect_rollout(model, args, device, rng, iteration):
                 "player_1": opponent.act(obs["player_1"]),
             }
         )
-        reward = reward_diff(raw_reward)
+        reward = training_reward(raw_reward, info, next_info, args.reward_mode)
         done = bool(np.asarray(terminated).any() or np.asarray(truncated).any())
         current_return += reward
         rollout_reward += reward
@@ -148,6 +166,7 @@ def collect_rollout(model, args, device, rng, iteration):
             transitions.append(
                 Transition(
                     features=candidates.features.astype(np.float32),
+                    global_features=candidates.global_features.astype(np.float32),
                     action_index=int(action_index),
                     log_prob=float(log_prob),
                     value=float(value),
@@ -201,6 +220,7 @@ def make_batch(transitions, indices, advantages, returns, device):
     max_candidates = max(transition.features.shape[0] for transition in batch)
 
     features = np.zeros((batch_size, max_candidates, FEATURE_DIM), dtype=np.float32)
+    global_features = np.zeros((batch_size, GLOBAL_FEATURE_DIM), dtype=np.float32)
     valid_mask = np.zeros((batch_size, max_candidates), dtype=bool)
     action_indices = np.zeros(batch_size, dtype=np.int64)
     old_log_probs = np.zeros(batch_size, dtype=np.float32)
@@ -210,6 +230,7 @@ def make_batch(transitions, indices, advantages, returns, device):
     for row, transition in enumerate(batch):
         n = transition.features.shape[0]
         features[row, :n] = transition.features
+        global_features[row] = transition.global_features
         valid_mask[row, :n] = True
         action_indices[row] = transition.action_index
         old_log_probs[row] = transition.log_prob
@@ -218,6 +239,7 @@ def make_batch(transitions, indices, advantages, returns, device):
 
     return (
         torch.from_numpy(features).to(device),
+        torch.from_numpy(global_features).to(device),
         torch.from_numpy(valid_mask).to(device),
         torch.from_numpy(action_indices).to(device),
         torch.from_numpy(old_log_probs).to(device),
@@ -237,6 +259,7 @@ def ppo_update(model, optimizer, transitions, advantages, returns, args, device,
             batch_indices = indices[start:start + args.batch_size]
             (
                 features,
+                global_features,
                 valid_mask,
                 action_indices,
                 old_log_probs,
@@ -244,7 +267,7 @@ def ppo_update(model, optimizer, transitions, advantages, returns, args, device,
                 batch_returns,
             ) = make_batch(transitions, batch_indices, advantages, returns, device)
 
-            logits, values = model(features, valid_mask)
+            logits, values = model(features, valid_mask, global_features)
             dist = Categorical(logits=logits)
             log_probs = dist.log_prob(action_indices)
             entropy = dist.entropy().mean()
@@ -347,8 +370,9 @@ def save_checkpoint(model, path, iteration, metrics, args):
             "metrics": metrics,
             "args": vars(args),
             "feature_dim": FEATURE_DIM,
+            "global_feature_dim": GLOBAL_FEATURE_DIM,
             "hidden_dim": int(args.hidden_dim),
-            "architecture": "target_selection_mlp_tanh_2x",
+            "architecture": "target_selection_mlp_tanh_2x_abandon_rich_critic",
         },
         path,
     )
@@ -371,7 +395,7 @@ def parse_args():
     parser.add_argument("--best-checkpoint-path", type=Path, default=None)
     parser.add_argument("--resume-path", type=Path, default=None)
     parser.add_argument("--eval-only", action="store_true")
-    parser.add_argument("--iterations", type=int, default=30)
+    parser.add_argument("--iterations", type=int, default=20)
     parser.add_argument("--rollout-steps", type=int, default=3000)
     parser.add_argument("--ppo-epochs", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=256)
@@ -381,12 +405,18 @@ def parse_args():
     parser.add_argument("--gae-lambda", type=float, default=0.95)
     parser.add_argument("--clip-coef", type=float, default=0.2)
     parser.add_argument("--value-coef", type=float, default=0.5)
-    parser.add_argument("--entropy-coef", type=float, default=0.01)
+    parser.add_argument("--entropy-coef", type=float, default=0.02)
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
+    parser.add_argument(
+        "--reward-mode",
+        choices=["score_delta", "env_diff"],
+        default="score_delta",
+        help="score_delta optimizes item-score changes; env_diff uses raw environment reward difference.",
+    )
     parser.add_argument(
         "--opponent-mix",
         type=parse_opponent_mix,
-        default=parse_opponent_mix("bfs:0.5,rollout_gated:0.5"),
+        default=parse_opponent_mix("bfs:0.4,rollout_gated:0.6"),
     )
     parser.add_argument(
         "--eval-opponents",
@@ -437,7 +467,8 @@ def main():
     print(
         f"target_selection_mlp device={device} resumed={resumed} "
         f"iterations={args.iterations} rollout_steps={args.rollout_steps} "
-        f"hidden_dim={args.hidden_dim} opponent_mix={args.opponent_mix}",
+        f"hidden_dim={args.hidden_dim} reward_mode={args.reward_mode} "
+        f"opponent_mix={args.opponent_mix}",
         flush=True,
     )
 
