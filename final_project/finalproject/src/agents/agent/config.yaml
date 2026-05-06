@@ -1,0 +1,12 @@
+seed: 0
+action_space: 4
+cluster_radius: 4
+cluster_weight: 0.75
+distance_weight: 1.0
+opponent_weight: 0.5
+route_weight: 10.0
+route_depth: 3
+route_decay: 0.7
+switch_margin: 1.5
+max_extra_distance: 3
+min_cluster_size: 2
