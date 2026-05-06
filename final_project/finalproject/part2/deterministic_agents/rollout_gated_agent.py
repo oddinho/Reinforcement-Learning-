@@ -18,6 +18,7 @@ ACTIONS = np.array(
     dtype=np.int32,
 )
 
+
 DEFAULT_CONFIG = {
     "cluster_radius": 4,
     "cluster_weight": 0.75,
@@ -46,6 +47,7 @@ def get_state_parts(observation):
 def valid_neighbors(tile_map, pos):
     height, width = tile_map.shape
     y, x = pos
+
     for action, (dy, dx) in enumerate(ACTIONS):
         ny, nx = y + int(dy), x + int(dx)
         if 0 <= ny < height and 0 <= nx < width and tile_map[ny, nx] != 1:
@@ -93,6 +95,7 @@ def route_value(target, items, item_distance_maps, depth, decay):
         ]
         if not reachable:
             break
+
         leg_distance, next_item = min(reachable)
         value += (decay ** route_step) / float(1 + leg_distance)
         remaining.remove(next_item)
@@ -170,9 +173,9 @@ def choose_action(observation, config):
             row["race_margin"],
         ),
     )
-
     extra_distance = candidate["distance"] - greedy["distance"]
     score_edge = candidate["score"] - greedy["score"]
+
     should_switch = (
         candidate["target"] != greedy["target"]
         and candidate["cluster_size"] >= config["min_cluster_size"]
@@ -188,7 +191,12 @@ def choose_action(observation, config):
 
 
 class Agent(BaseAgent):
-    #purely deterministic bsf + clusterin + rute value based agent
+    """Deterministic BFS variant with gated route-value target switching.
+
+    The agent normally follows nearest-item BFS. It switches to a nearby
+    alternative target only when that target opens a better short route through
+    follow-up items, matching the best `rollout_gated` autoresearch variant.
+    """
 
     def __init__(self, config: SimpleNamespace):
         super().__init__(config)
