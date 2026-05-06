@@ -1,4 +1,0 @@
-- Git workflow: for this session, keeping work on `ojay-testing` is enough; do not push to `main` unless explicitly requested.
-- Keep experimental Collector agents in `final_project/finalproject/part2` until performance is satisfactory; copy into `src/agents/agent` only when preparing a real submission.
-- For Collector overnight iteration, prefer scripted sweeps that write Markdown and JSON reports under `final_project/finalproject/part2/autoresearch_reports`.
-- For Collector agent optimization, treat random as a smoke/regression opponent; prioritize baseline and BFS for deciding whether a variant is actually better.
