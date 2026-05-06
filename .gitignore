@@ -25,6 +25,7 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.zip
 MANIFEST
 
 # PyInstaller
@@ -132,3 +133,21 @@ dmypy.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Local secrets / tokens
+token.md
+history.md
+AGENTS.md
+AGENTS
+best_practices.md
+
+# Part 2 generated experiment artifacts
+final_project/finalproject/part2/checkpoints/*
+!final_project/finalproject/part2/checkpoints/.gitkeep
+final_project/finalproject/part2/training_logs/*
+!final_project/finalproject/part2/training_logs/.gitkeep
+final_project/finalproject/part2/recordings/*
+!final_project/finalproject/part2/recordings/.gitkeep
+final_project/finalproject/part2/autoresearch_reports/*
+!final_project/finalproject/part2/autoresearch_reports/.gitkeep
+
