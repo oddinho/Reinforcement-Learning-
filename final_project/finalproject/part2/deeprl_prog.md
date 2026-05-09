@@ -312,6 +312,519 @@ Status before leaving school:
   useful to preserve as a model result
 - restart this experiment from scratch when training can run uninterrupted
 
+### Restarted 30-Iteration Abandonment Run
+
+Restarted the abandonment-aware PPO experiment from scratch after getting back
+to a machine that can run uninterrupted.
+
+Current run:
+
+```text
+iterations=30
+rollout_steps=3000
+ppo_epochs=4
+batch_size=256
+learning_rate=2.5e-4
+entropy_coef=0.02
+reward_mode=score_delta
+opponent_mix=bfs:0.4,rollout_gated:0.6
+eval_opponents=bfs, rollout_gated
+eval_seeds=0,1,2,3,4
+checkpoint=checkpoints/target_selection_ppo_mlp_abandon_30_latest.pt
+log=training_logs/target_selection_ppo_mlp_abandon_30_stdout.log
+```
+
+The reason for using 30 iterations here, instead of the earlier 20-iteration
+budget, is that this is now a changed state representation rather than just a
+small opponent-mix tweak. The policy has new direct information about contested
+targets, lost races, score pressure, and late-game urgency. It is reasonable to
+give PPO more room to adapt before judging whether these features help.
+
+First logged checkpoint:
+
+| Iteration | BFS mean | rollout_gated mean | Selection score |
+| --- | ---: | ---: | ---: |
+| 1 | `-1.00` | `-6.00` | `-6.00` |
+
+Interpretation of iteration 1:
+
+- it is not yet evidence that the abandonment features failed
+- the rollout training return was still very negative, which is expected for a
+  near-random early policy
+- BFS eval was already close to even on five seeds, but `rollout_gated` was
+  still clearly ahead
+- the useful question is whether later iterations improve the worst opponent,
+  not whether iteration 1 beats the deterministic agents
+
+What to watch:
+
+- the saved-best selection score should improve above `-6.00`
+- BFS mean should stay near zero or positive while rollout_gated improves
+- entropy should not collapse too early
+- KL should remain nonzero but moderate; near-zero KL for many iterations would
+  mean the policy is barely changing
+- replay inspection should specifically check whether the agent abandons
+  targets when the opponent is closer and the route value is no longer useful
+
+Completed result:
+
+- the run completed all 30 iterations
+- stderr was clean
+- final checkpoint was not the best checkpoint
+- the saved-best checkpoint was iteration 19
+
+Best checkpoint:
+
+```text
+checkpoints/target_selection_ppo_mlp_abandon_30_latest_best.pt
+```
+
+Training eval for the saved-best checkpoint:
+
+| Opponent | Seeds | Mean score diff | Min | Max |
+| --- | --- | ---: | ---: | ---: |
+| BFS | `0..4` | `+11.20` | `+3` | `+18` |
+| rollout_gated | `0..4` | `+7.20` | `-4` | `+14` |
+
+Follow-up eval for the saved-best checkpoint:
+
+| Opponent | Seeds | Mean score diff | Min | Max |
+| --- | --- | ---: | ---: | ---: |
+| BFS | `0..9` | `+9.90` | `+3` | `+18` |
+| rollout_gated | `0..9` | `+4.70` | `-4` | `+14` |
+
+Eval logs:
+
+- `training_logs/target_selection_ppo_mlp_abandon_30_best_eval10.log`
+- `training_logs/target_selection_ppo_mlp_abandon_30_best_eval10_rollout_gated.log`
+
+Final checkpoint at iteration 30:
+
+| Opponent | Seeds | Mean score diff | Min | Max |
+| --- | --- | ---: | ---: | ---: |
+| BFS | `0..4` | `+6.00` | `-1` | `+13` |
+| rollout_gated | `0..4` | `-3.40` | `-13` | `+6` |
+
+Interpretation:
+
+- the abandonment-aware features helped substantially compared with the
+  earlier route-only MLP runs
+- iteration 19 is much stronger and more balanced than the final checkpoint,
+  so late training still drifts
+- this reinforces saving by balanced eval instead of using the last checkpoint
+- entropy was low by the late iterations, so the policy may be becoming too
+  deterministic after it finds a good target-selection style
+- the next serious validation step is a wider fixed-seed eval before treating
+  this as a candidate submission model
+
+Recorded replays from the iteration-19 best checkpoint:
+
+- `recordings/target_selection_ppo_mlp_abandon_30_best_vs_bfs_seed0.json`
+- `recordings/target_selection_ppo_mlp_abandon_30_best_vs_rollout_gated_seed0.json`
+
+Replay note:
+
+- seed 0 vs BFS wins `148-141`
+- seed 0 vs rollout_gated loses narrowly `155-159`
+- this is consistent with the eval table: rollout_gated seed 0 was the one
+  losing seed for the best checkpoint, while seeds 1-4 were positive
+
+Submission package snapshot:
+
+The iteration-19 best checkpoint has been stored locally in upload-ready
+structure:
+
+```text
+submission_agents/target_selection_ppo_abandon_30_agent/
+  agent.py
+  config.yaml
+  weights/model.pth
+```
+
+Clean zip:
+
+```text
+submission_agents/target_selection_ppo_abandon_30_agent.zip
+```
+
+The zip contains only:
+
+```text
+agent.py
+config.yaml
+weights/model.pth
+```
+
+The package was smoke-tested through `src/compete/compete.py` against the
+baseline agent and loaded successfully.
+
+### Fine-Tune From Best Checkpoint
+
+Started a short fine-tune from the iteration-19 best checkpoint to see whether
+lower learning rate and lower entropy can improve the already-good policy
+without causing the late-run drift seen in the 30-iteration run.
+
+Fine-tune setup:
+
+```text
+resume_path=checkpoints/target_selection_ppo_mlp_abandon_30_latest_best.pt
+iterations=10
+rollout_steps=3000
+ppo_epochs=4
+batch_size=256
+learning_rate=1.0e-4
+entropy_coef=0.01
+reward_mode=score_delta
+opponent_mix=bfs:0.4,rollout_gated:0.6
+eval_opponents=bfs, rollout_gated
+eval_seeds=0,1,2,3,4
+checkpoint=checkpoints/target_selection_ppo_mlp_abandon_30_finetune_latest.pt
+log=training_logs/target_selection_ppo_mlp_abandon_30_finetune_stdout.log
+```
+
+Important caveat:
+
+- this is a fine-tune from model weights, not an exact optimizer-state resume
+- the original iteration-19 best checkpoint and submission package are kept
+  separately, so the fine-tune cannot overwrite the current best model
+
+Fine-tune result:
+
+- the 10-iteration fine-tune completed cleanly
+- the best fine-tune checkpoint was iteration 4 by the same balanced
+  5-seed selection score
+- it did not improve over the original iteration-19 checkpoint
+
+Fine-tune best checkpoint:
+
+```text
+checkpoints/target_selection_ppo_mlp_abandon_30_finetune_latest_best.pt
+```
+
+Training eval for the best fine-tune checkpoint:
+
+| Opponent | Seeds | Mean score diff | Min | Max |
+| --- | --- | ---: | ---: | ---: |
+| BFS | `0..4` | `+5.40` | `-4` | `+15` |
+| rollout_gated | `0..4` | `+6.00` | `-2` | `+18` |
+
+Follow-up eval for the best fine-tune checkpoint:
+
+| Opponent | Seeds | Mean score diff | Min | Max |
+| --- | --- | ---: | ---: | ---: |
+| BFS | `0..9` | `+2.50` | `-12` | `+15` |
+| rollout_gated | `0..9` | `+3.90` | `-7` | `+18` |
+
+Comparison to original iteration-19 checkpoint:
+
+| Checkpoint | BFS `0..9` | rollout_gated `0..9` |
+| --- | ---: | ---: |
+| original iteration 19 | `+9.90` | `+4.70` |
+| fine-tune best | `+2.50` | `+3.90` |
+
+Interpretation:
+
+- fine-tuning from the best weights caused policy drift instead of useful
+  refinement
+- lowering LR and entropy was not enough to preserve the BFS behavior
+- keep the original iteration-19 submission package as the current best model
+- further improvement should use a fresh run with better checkpoint selection
+  or an explicit constraint/regularizer toward the saved policy, rather than
+  naive continuation
+
+### Snapshot Self-Play Run
+
+Implemented frozen-snapshot self-play for the next training experiment.
+
+New trainer support:
+
+- `ppo_snapshot` is now a valid opponent name
+- `--self-play-checkpoint` points to the frozen PPO model used as opponent
+- `--selection-opponents` controls which eval opponents are used for
+  best-checkpoint selection
+- the snapshot opponent is loaded as a deterministic target-selection PPO
+  policy, so the learner plays against a fixed copy of the current best model
+
+Reasoning:
+
+- this is not live self-play where both policies update
+- the opponent is a frozen copy of the iteration-19 checkpoint
+- this is more stable and easier to interpret
+- BFS and rollout_gated remain in the opponent mix so the learner does not
+  overfit only to the snapshot policy
+- best-checkpoint selection still uses only BFS and rollout_gated because
+  those are the real target opponents
+
+Started a fresh 30-iteration run:
+
+```text
+iterations=30
+rollout_steps=3000
+ppo_epochs=4
+batch_size=256
+learning_rate=2.5e-4
+entropy_coef=0.02
+reward_mode=score_delta
+opponent_mix=bfs:0.25,rollout_gated:0.45,ppo_snapshot:0.30
+self_play_checkpoint=checkpoints/target_selection_ppo_mlp_abandon_30_latest_best.pt
+eval_opponents=bfs, rollout_gated, ppo_snapshot
+selection_opponents=bfs, rollout_gated
+eval_seeds=0,1,2,3,4
+checkpoint=checkpoints/target_selection_ppo_mlp_selfplay_snapshot_latest.pt
+log=training_logs/target_selection_ppo_mlp_selfplay_snapshot_stdout.log
+```
+
+What would count as success:
+
+- better 10-seed validation than the original iteration-19 checkpoint
+- especially improving rollout_gated while keeping BFS strongly positive
+- no replacement unless it beats:
+  - BFS `0..9`: `+9.90`
+  - rollout_gated `0..9`: `+4.70`
+
+Watch command:
+
+```powershell
+Get-Content C:\pythonlek\8sem\Reinforcement-Learning-\final_project\finalproject\part2\training_logs\target_selection_ppo_mlp_selfplay_snapshot_stdout.log -Wait -Tail 40
+```
+
+Overnight result:
+
+- the run completed all 30 iterations
+- stderr was clean
+- the saved-best checkpoint was iteration 14
+- the latest checkpoint is iteration 30
+
+Self-play saved-best checkpoint:
+
+```text
+checkpoints/target_selection_ppo_mlp_selfplay_snapshot_latest_best.pt
+```
+
+Training eval for iteration 14:
+
+| Opponent | Seeds | Mean score diff | Min | Max |
+| --- | --- | ---: | ---: | ---: |
+| BFS | `0..4` | `+10.80` | `0` | `+18` |
+| rollout_gated | `0..4` | `+5.00` | `-5` | `+19` |
+| ppo_snapshot | `0..4` | `+1.20` | `-7` | `+8` |
+
+Latest checkpoint:
+
+```text
+checkpoints/target_selection_ppo_mlp_selfplay_snapshot_latest.pt
+```
+
+Training eval for iteration 30:
+
+| Opponent | Seeds | Mean score diff | Min | Max |
+| --- | --- | ---: | ---: | ---: |
+| BFS | `0..4` | `+4.00` | `-1` | `+12` |
+| rollout_gated | `0..4` | `+4.40` | `-1` | `+8` |
+| ppo_snapshot | `0..4` | `+1.00` | `-3` | `+6` |
+
+Interpretation:
+
+- iteration 30 is interesting because it is more balanced and has fewer severe
+  losses on the five eval seeds
+- iteration 14 is still stronger by the configured selection metric because it
+  keeps BFS much higher while also beating rollout_gated
+- snapshot self-play did not obviously beat the previous best PPO checkpoint
+  on the small eval set, but it produced a competitive saved-best checkpoint
+- before packaging anything from this run, run 10-seed validation for both
+  iteration 14 and iteration 30 and compare against the original iteration-19
+  abandonment checkpoint
+
+### Shaped Cluster/Front-Run Reward Run
+
+Replay inspection after the first submitted PPO model showed two remaining
+weaknesses:
+
+- the policy can still keep chasing targets the opponent is clearly favored to
+  win
+- cluster and route priority is present in the features, but not always strong
+  enough in the learned policy
+
+Implemented a new reward mode:
+
+```text
+score_delta_shaped
+```
+
+This keeps the original score-difference delta as the base reward and adds
+small dense target-selection hints from the selected target row:
+
+```text
+reward =
+    score_delta
+    + own_favored_cluster_bonus
+    + own_favored_route_bonus
+    + front_run_collect_bonus
+    - lost_race_penalty
+    - lost_route_penalty
+```
+
+Default shaping coefficients:
+
+| Term | Value |
+| --- | ---: |
+| cluster bonus | `0.02` |
+| route bonus | `0.03` |
+| front-run collect bonus | `0.05` |
+| lost-race penalty | `0.04` |
+| lost-route penalty | `0.03` |
+| per-step shaping clip | `0.15` |
+
+Details:
+
+- cluster and route bonuses apply only when the target race is own-favored
+- front-run bonus applies when we collect and the target looked contested or
+  strategically valuable
+- lost-race penalties apply when the opponent is clearly favored to reach the
+  selected target first
+- all shaping is small and clipped so final item score remains the main signal
+
+The new rollout log includes:
+
+```text
+mean_shaping=...
+```
+
+This should make it easier to see whether the shaping terms are actually
+active during collection.
+
+Started a fresh 30-iteration shaped snapshot-self-play run:
+
+```text
+iterations=30
+rollout_steps=3000
+ppo_epochs=4
+batch_size=256
+learning_rate=2.5e-4
+entropy_coef=0.02
+reward_mode=score_delta_shaped
+opponent_mix=bfs:0.25,rollout_gated:0.45,ppo_snapshot:0.30
+self_play_checkpoint=checkpoints/target_selection_ppo_mlp_abandon_30_latest_best.pt
+eval_opponents=bfs, rollout_gated, ppo_snapshot
+selection_opponents=bfs, rollout_gated
+eval_seeds=0,1,2,3,4
+checkpoint=checkpoints/target_selection_ppo_mlp_shaped_selfplay_latest.pt
+log=training_logs/target_selection_ppo_mlp_shaped_selfplay_stdout.log
+```
+
+Success criterion:
+
+- must beat or at least match the submitted PPO on 10-seed validation
+- especially should improve rollout_gated while keeping BFS strongly positive
+- do not package unless it beats the current submitted PPO:
+  - BFS `0..9`: `+9.90`
+  - rollout_gated `0..9`: `+4.70`
+
+10-seed validation result:
+
+| Opponent | Seeds | Mean score diff | Min | Max |
+| --- | --- | ---: | ---: | ---: |
+| BFS | `0..9` | `+5.90` | `-7` | `+15` |
+| rollout_gated | `0..9` | `+2.30` | `-5` | `+19` |
+| ppo_snapshot | `0..9` | `+2.70` | `-10` | `+36` |
+
+Eval log:
+
+```text
+training_logs/target_selection_ppo_mlp_shaped_selfplay_best_eval10.log
+```
+
+Interpretation:
+
+- the shaped checkpoint looked strong on the 5-seed training eval, but did not
+  generalize to 10 seeds
+- it is worse than the submitted PPO checkpoint on both real opponents
+- do not package this checkpoint
+- the shaping signal was probably too seed-specific or too strong relative to
+  the sparse score objective
+- position features should not be added on top of this checkpoint as a
+  fine-tune candidate; if tested, use a fresh run or migrate from the submitted
+  iteration-19 checkpoint instead
+
+### Position-Feature Migration From Best PPO
+
+Next experiment: return to the strongest submitted PPO snapshot and add
+explicit target-position features.
+
+Starting checkpoint:
+
+```text
+checkpoints/target_selection_ppo_mlp_abandon_30_latest_best.pt
+```
+
+This checkpoint is still the best validated PPO so far:
+
+| Opponent | Seeds | Mean score diff |
+| --- | --- | ---: |
+| BFS | `0..9` | `+9.90` |
+| rollout_gated | `0..9` | `+4.70` |
+
+Reasoning:
+
+- the shaped self-play checkpoint looked promising on five seeds but got worse
+  on ten-seed validation
+- the old best abandonment-aware checkpoint generalizes better, so it is the
+  cleaner base model
+- position may matter because targets near the center can preserve future
+  routing options, while isolated edge targets can waste tempo
+- the feature should be input-only for this run, not extra reward shaping, so
+  we can isolate whether the model benefits from seeing the signal
+
+Implemented position inputs:
+
+| Feature | Meaning |
+| --- | --- |
+| `center_score` | high when the target is near the middle of the board |
+| `edge_score` | high when the target is near an edge |
+| `center_cluster_value` | cluster value weighted by centrality |
+| `edge_cluster_value` | cluster value weighted by edge proximity |
+
+The target feature dimension increased from `23` to `27`. The original 23
+features are kept in the same order so reward shaping indices and old learned
+weights remain meaningful.
+
+Checkpoint migration was added to `train_target_selection_ppo.py`:
+
+- old actor input weights are copied into the first 23 columns
+- old critic pooled-feature blocks are copied into the corresponding widened
+  mean/max/min blocks
+- global critic features and candidate-count weights are copied unchanged
+- new position-feature columns start with zero input weight, so the migrated
+  model initially behaves like the old best checkpoint
+
+Run setup:
+
+```text
+resume_path=checkpoints/target_selection_ppo_mlp_abandon_30_latest_best.pt
+iterations=30
+rollout_steps=3000
+ppo_epochs=4
+batch_size=256
+learning_rate=1.0e-4
+entropy_coef=0.02
+reward_mode=score_delta
+opponent_mix=bfs:0.25,rollout_gated:0.45,ppo_snapshot:0.30
+self_play_checkpoint=checkpoints/target_selection_ppo_mlp_abandon_30_latest_best.pt
+eval_opponents=bfs, rollout_gated, ppo_snapshot
+selection_opponents=bfs, rollout_gated
+eval_seeds=0,1,2,3,4
+checkpoint=checkpoints/target_selection_ppo_mlp_position_selfplay_latest.pt
+log=training_logs/target_selection_ppo_mlp_position_selfplay_stdout.log
+```
+
+Success criterion:
+
+- first compare against the submitted PPO on five-seed training eval
+- if promising, run ten-seed validation against BFS and rollout_gated
+- do not package unless it improves on the submitted PPO baseline:
+  - BFS `0..9`: `+9.90`
+  - rollout_gated `0..9`: `+4.70`
+
 ## Current Files
 
 - `target_selection_ppo_mlp.py`
@@ -348,19 +861,19 @@ checkpoints/target_selection_ppo_mlp_abandon_latest.pt
 Recommended training command from `final_project/finalproject/part2`:
 
 ```powershell
-python .\train_target_selection_ppo.py --iterations 20 --rollout-steps 3000 --ppo-epochs 4 --batch-size 256 --learning-rate 2.5e-4 --entropy-coef 0.02 --reward-mode score_delta --opponent-mix bfs:0.4,rollout_gated:0.6 --eval-opponents bfs rollout_gated --eval-seeds 0 1 2 3 4 --checkpoint-path .\checkpoints\target_selection_ppo_mlp_abandon_latest.pt
+python .\train_target_selection_ppo.py --iterations 30 --rollout-steps 3000 --ppo-epochs 4 --batch-size 256 --learning-rate 2.5e-4 --entropy-coef 0.02 --reward-mode score_delta --opponent-mix bfs:0.4,rollout_gated:0.6 --eval-opponents bfs rollout_gated --eval-seeds 0 1 2 3 4 --checkpoint-path .\checkpoints\target_selection_ppo_mlp_abandon_30_latest.pt
 ```
 
 Evaluate a checkpoint:
 
 ```powershell
-python .\train_target_selection_ppo.py --eval-only --checkpoint-path .\checkpoints\target_selection_ppo_mlp_abandon_latest_best.pt --eval-opponents bfs rollout_gated --eval-seeds 0 1 2 3 4 5 6 7 8 9 --eval-steps 1000
+python .\train_target_selection_ppo.py --eval-only --checkpoint-path .\checkpoints\target_selection_ppo_mlp_abandon_30_latest_best.pt --eval-opponents bfs rollout_gated --eval-seeds 0 1 2 3 4 5 6 7 8 9 --eval-steps 1000
 ```
 
 Record a replay:
 
 ```powershell
-python .\record_target_selection_ppo.py --checkpoint-path .\checkpoints\target_selection_ppo_mlp_abandon_latest_best.pt --opponent bfs --seed 0 --output .\recordings\target_selection_ppo_mlp_abandon_vs_bfs_seed0.json
+python .\record_target_selection_ppo.py --checkpoint-path .\checkpoints\target_selection_ppo_mlp_abandon_30_latest_best.pt --opponent bfs --seed 0 --output .\recordings\target_selection_ppo_mlp_abandon_30_vs_bfs_seed0.json
 ```
 
 ## Success Criterion
@@ -402,5 +915,3 @@ weights/model.pth
 ## ojay, notes. 
 - think 2 layer fc mlp approach looks promising. 
 - can think about enriching input if neccessary, more feature eng perhaps. Also, parameter search as in the 2017 OpenaAi paper at some point?.
-
-## want next updates under here!

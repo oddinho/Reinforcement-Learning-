@@ -1,4 +1,4 @@
-"""Small target-selection policy used by PPO training and replay.
+"""Deeper target-selection policy used by PPO training and replay.
 
 The policy does not learn movement. It scores reachable item targets, and BFS
 turns the selected target into the first shortest-path move.
@@ -348,7 +348,7 @@ class TargetSelectionMLP(nn.Module):
     pooled summary of the current candidate set.
     """
 
-    def __init__(self, feature_dim=FEATURE_DIM, hidden_dim=64):
+    def __init__(self, feature_dim=FEATURE_DIM, hidden_dim=128):
         super().__init__()
         self.feature_dim = int(feature_dim)
         self.hidden_dim = int(hidden_dim)

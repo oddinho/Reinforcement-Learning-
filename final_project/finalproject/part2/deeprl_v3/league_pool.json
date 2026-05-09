@@ -1,0 +1,97 @@
+{
+  "accepted": [
+    {
+      "generation": 1,
+      "path": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\ppo_league_gen1.pt",
+      "source_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\league_gen01_latest.pt",
+      "iteration": 20,
+      "deterministic_score": 6.2,
+      "ppo_score": 6.0,
+      "means": {
+        "bfs": 17.6,
+        "rollout_gated": 6.2,
+        "ppo": 6.6,
+        "position_aware_ppo": 6.0
+      },
+      "opponent_mix": "manual_accept_for_behavioral_replay",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\league_gen01_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\league_gen01_eval10.log",
+      "accepted_at": "manual"
+    },
+    {
+      "generation": 5,
+      "path": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\ppo_league_gen5.pt",
+      "source_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\league_gen05_latest_best.pt",
+      "iteration": 13,
+      "mean_gate_score": 2.5,
+      "win_gate_score": 7,
+      "means": {
+        "bfs": 16.0,
+        "rollout_gated": 11.0,
+        "ppo": 11.4,
+        "position_aware_ppo": 2.5
+      },
+      "wins": {
+        "bfs": 10,
+        "rollout_gated": 9,
+        "ppo": 9,
+        "position_aware_ppo": 7
+      },
+      "score_diffs": {
+        "bfs": [
+          17,
+          33,
+          34,
+          18,
+          13,
+          7,
+          19,
+          7,
+          6,
+          6
+        ],
+        "rollout_gated": [
+          22,
+          14,
+          11,
+          -8,
+          12,
+          21,
+          4,
+          7,
+          20,
+          7
+        ],
+        "ppo": [
+          31,
+          8,
+          10,
+          11,
+          26,
+          3,
+          -4,
+          4,
+          21,
+          4
+        ],
+        "position_aware_ppo": [
+          7,
+          9,
+          3,
+          10,
+          3,
+          0,
+          2,
+          -2,
+          5,
+          -12
+        ]
+      },
+      "opponent_mix": "bfs:0.11250000,rollout_gated:0.18750000,ppo:0.18750000,position_aware_ppo:0.26250000,league:0.25000000",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\league_gen05_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\league_gen05_eval10.log",
+      "accepted_at": "2026-05-09T06:58:54"
+    }
+  ],
+  "best_score": 2.5
+}

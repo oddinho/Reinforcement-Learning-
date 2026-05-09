@@ -13,20 +13,23 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 
 
-PART2_ROOT = Path(__file__).resolve().parent
+EXPERIMENT_ROOT = Path(__file__).resolve().parent
+PART2_ROOT = EXPERIMENT_ROOT.parent
 PROJECT_ROOT = PART2_ROOT.parent
 SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 if str(PART2_ROOT) not in sys.path:
     sys.path.insert(0, str(PART2_ROOT))
+if str(EXPERIMENT_ROOT) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENT_ROOT))
 
 from agents.baseline.agent import Agent as BaselineAgent
 from agents.random.agent import Agent as RandomAgent
 from environments.collector.wrappers import CollectorGymEnv
 
 from deterministic_agents import bfs_agent, rollout_gated_agent
-from target_selection_ppo_mlp import (
+from target_selection_ppo_mlp_v3 import (
     ACTION_DIM,
     FEATURE_DIM,
     GLOBAL_FEATURE_DIM,
@@ -39,10 +42,26 @@ from target_selection_ppo_mlp import (
 )
 
 
-CHECKPOINT_DIR = PART2_ROOT / "checkpoints"
-DEFAULT_CHECKPOINT = CHECKPOINT_DIR / "target_selection_ppo_mlp_abandon_latest.pt"
-OPPONENT_CHOICES = ("bfs", "rollout_gated", "baseline", "random", "ppo_snapshot")
-REAL_EVAL_OPPONENTS = ("bfs", "rollout_gated")
+CHECKPOINT_DIR = EXPERIMENT_ROOT / "checkpoints"
+DEFAULT_CHECKPOINT = CHECKPOINT_DIR / "target_selection_ppo_mlp_v3_latest.pt"
+DEFAULT_PPO_CHECKPOINT = (
+    PART2_ROOT / "checkpoints" / "target_selection_ppo_mlp_abandon_30_latest_best.pt"
+)
+DEFAULT_POSITION_AWARE_PPO_CHECKPOINT = (
+    PART2_ROOT
+    / "checkpoints"
+    / "target_selection_ppo_mlp_position_selfplay_latest_best.pt"
+)
+OPPONENT_CHOICES = (
+    "bfs",
+    "rollout_gated",
+    "ppo",
+    "position_aware_ppo",
+    "league",
+    "baseline",
+    "random",
+)
+REAL_EVAL_OPPONENTS = ("bfs", "rollout_gated", "ppo", "position_aware_ppo")
 
 FEATURE_CLUSTER3 = 10
 FEATURE_CLUSTER5 = 11
@@ -53,6 +72,11 @@ FEATURE_LOST_RACE = 16
 FEATURE_ROUTE_IF_OWN_FAVORED = 17
 FEATURE_ROUTE_IF_LOST = 18
 FEATURE_BEHIND = 20
+FEATURE_CENTER_CLUSTER_VALUE = 25
+FEATURE_CLUSTER_CONTROL_VALUE = 27
+FEATURE_CLUSTER_RACE_MARGIN = 28
+FEATURE_SINGLETON_TUNNEL = 29
+FEATURE_CLUSTER_SWING_VALUE = 30
 
 
 @dataclass
@@ -86,7 +110,52 @@ def choose_opponent_name(rng, opponent_mix):
     return str(rng.choice(names, p=probabilities))
 
 
+def checkpoint_hidden_dim(path, device, default=64):
+    checkpoint_path = Path(path)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    if isinstance(checkpoint, dict):
+        return int(checkpoint.get("hidden_dim", default))
+    return int(default)
+
+
+def build_ppo_checkpoint_opponent(path, seed, device):
+    hidden_dim = checkpoint_hidden_dim(path, device)
+    snapshot_model = TargetSelectionMLP(hidden_dim=hidden_dim).to(device)
+    loaded = load_checkpoint(snapshot_model, path, device)
+    if not loaded:
+        raise FileNotFoundError(f"Could not load PPO opponent checkpoint: {path}")
+    snapshot_model.eval()
+    return DeterministicTargetSelectionAgent(
+        snapshot_model,
+        device,
+        seed=seed,
+    )
+
+
+def choose_league_checkpoint(paths, seed, weights=None):
+    if not paths:
+        raise ValueError("league opponent requires --league-checkpoints")
+    if weights:
+        if len(weights) != len(paths):
+            raise ValueError(
+                "--league-checkpoint-weights must match --league-checkpoints length"
+            )
+        total = float(sum(weights))
+        if total <= 0.0:
+            raise ValueError("--league-checkpoint-weights must sum to > 0")
+        normalized = [float(weight) / total for weight in weights]
+        index = random.Random(int(seed)).choices(
+            range(len(paths)),
+            weights=normalized,
+            k=1,
+        )[0]
+    else:
+        index = abs(int(seed)) % len(paths)
+    return Path(paths[index])
+
+
 def build_opponent(name, seed, args=None, device=None):
+    snapshot_device = device if device is not None else torch.device("cpu")
     if name == "bfs":
         agent = bfs_agent.Agent(SimpleNamespace(seed=seed, action_space=ACTION_DIM))
     elif name == "rollout_gated":
@@ -99,22 +168,33 @@ def build_opponent(name, seed, args=None, device=None):
         )
     elif name == "random":
         agent = RandomAgent(SimpleNamespace(seed=seed, action_space=ACTION_DIM))
-    elif name == "ppo_snapshot":
-        if args is None or args.self_play_checkpoint is None:
-            raise ValueError("ppo_snapshot requires --self-play-checkpoint")
-        snapshot_device = device if device is not None else torch.device("cpu")
-        snapshot_model = TargetSelectionMLP(hidden_dim=args.hidden_dim).to(snapshot_device)
-        loaded = load_checkpoint(snapshot_model, args.self_play_checkpoint, snapshot_device)
-        if not loaded:
-            raise FileNotFoundError(
-                f"Could not load self-play checkpoint: {args.self_play_checkpoint}"
-            )
-        snapshot_model.eval()
-        agent = DeterministicTargetSelectionAgent(
-            snapshot_model,
+    elif name == "ppo":
+        if args is None or args.ppo_checkpoint is None:
+            raise ValueError("ppo opponent requires --ppo-checkpoint")
+        agent = build_ppo_checkpoint_opponent(
+            args.ppo_checkpoint,
+            seed,
             snapshot_device,
-            seed=seed,
         )
+    elif name == "position_aware_ppo":
+        if args is None or args.position_aware_ppo_checkpoint is None:
+            raise ValueError(
+                "position_aware_ppo opponent requires --position-aware-ppo-checkpoint"
+            )
+        agent = build_ppo_checkpoint_opponent(
+            args.position_aware_ppo_checkpoint,
+            seed,
+            snapshot_device,
+        )
+    elif name == "league":
+        if args is None:
+            raise ValueError("league opponent requires args")
+        checkpoint = choose_league_checkpoint(
+            args.league_checkpoints,
+            seed,
+            args.league_checkpoint_weights,
+        )
+        agent = build_ppo_checkpoint_opponent(checkpoint, seed, snapshot_device)
     else:
         raise ValueError(f"Unknown opponent: {name}")
     if hasattr(agent, "load"):
@@ -138,7 +218,7 @@ def score_delta_diff(previous_info, next_info):
 def training_reward(raw_reward, previous_info, next_info, reward_mode):
     if reward_mode == "env_diff":
         return reward_diff(raw_reward)
-    if reward_mode in {"score_delta", "score_delta_shaped"}:
+    if reward_mode in {"score_delta", "score_delta_shaped", "score_delta_cluster"}:
         return score_delta_diff(previous_info, next_info)
     raise ValueError(f"Unknown reward mode: {reward_mode}")
 
@@ -204,6 +284,61 @@ def target_shaping_reward(candidates, action_index, previous_info, next_info, ar
     )
 
 
+def cluster_signal_reward(candidates, action_index, args):
+    """Focused dense signal for choosing controllable clusters over singletons."""
+
+    if candidates is None:
+        return 0.0
+    if action_index < 0 or action_index >= candidates.features.shape[0]:
+        return 0.0
+
+    row = candidates.features[action_index]
+    cluster_value = 0.5 * (float(row[FEATURE_CLUSTER3]) + float(row[FEATURE_CLUSTER5]))
+    route_value = float(row[FEATURE_ROUTE_VALUE])
+    own_favored = float(row[FEATURE_OWN_FAVORED])
+    lost_race = float(row[FEATURE_LOST_RACE])
+    center_cluster_value = float(row[FEATURE_CENTER_CLUSTER_VALUE])
+    cluster_control_value = float(row[FEATURE_CLUSTER_CONTROL_VALUE])
+    cluster_race_margin = float(row[FEATURE_CLUSTER_RACE_MARGIN])
+    singleton_tunnel = float(row[FEATURE_SINGLETON_TUNNEL])
+    cluster_swing_value = float(row[FEATURE_CLUSTER_SWING_VALUE])
+
+    cluster_bonus = (
+        args.cluster_signal_center_bonus
+        * own_favored
+        * center_cluster_value
+    )
+    route_bonus = args.cluster_signal_route_bonus * own_favored * route_value
+    control_bonus = (
+        args.cluster_signal_control_bonus
+        * max(own_favored, 1.0 if cluster_race_margin >= 0.0 else 0.0)
+        * cluster_control_value
+    )
+    swing_bonus = args.cluster_signal_swing_bonus * max(0.0, cluster_swing_value)
+    singleton_penalty = args.singleton_tunnel_penalty * singleton_tunnel
+    lost_cluster_penalty = (
+        args.cluster_signal_lost_penalty
+        * lost_race
+        * cluster_value
+    )
+
+    signal = (
+        cluster_bonus
+        + route_bonus
+        + control_bonus
+        + swing_bonus
+        - singleton_penalty
+        - lost_cluster_penalty
+    )
+    return float(
+        np.clip(
+            signal,
+            -args.cluster_signal_max_abs,
+            args.cluster_signal_max_abs,
+        )
+    )
+
+
 def collect_rollout(model, args, device, rng, iteration):
     env = CollectorGymEnv(numpy_output=True)
     obs = None
@@ -216,6 +351,7 @@ def collect_rollout(model, args, device, rng, iteration):
     current_return = 0.0
     rollout_reward = 0.0
     rollout_shaping_reward = 0.0
+    rollout_terminal_bonus = 0.0
 
     for _step in range(args.rollout_steps):
         if obs is None:
@@ -250,19 +386,29 @@ def collect_rollout(model, args, device, rng, iteration):
         )
         reward = training_reward(raw_reward, info, next_info, args.reward_mode)
         shaping_reward = 0.0
-        if args.reward_mode == "score_delta_shaped" and store_transition:
-            shaping_reward = target_shaping_reward(
-                candidates,
-                action_index,
-                info,
-                next_info,
-                args,
-            )
+        if store_transition:
+            if args.reward_mode == "score_delta_shaped":
+                shaping_reward = target_shaping_reward(
+                    candidates,
+                    action_index,
+                    info,
+                    next_info,
+                    args,
+                )
+            elif args.reward_mode == "score_delta_cluster":
+                shaping_reward = cluster_signal_reward(candidates, action_index, args)
             reward += shaping_reward
         done = bool(np.asarray(terminated).any() or np.asarray(truncated).any())
+        terminal_bonus = 0.0
+        if done and args.terminal_win_bonus != 0.0:
+            points = np.asarray(next_info["state"].team_points, dtype=int)
+            if int(points[0] - points[1]) > 0:
+                terminal_bonus = float(args.terminal_win_bonus)
+                reward += terminal_bonus
         current_return += reward
         rollout_reward += reward
         rollout_shaping_reward += shaping_reward
+        rollout_terminal_bonus += terminal_bonus
 
         if store_transition:
             transitions.append(
@@ -292,6 +438,7 @@ def collect_rollout(model, args, device, rng, iteration):
         "episodes": len(episode_returns),
         "mean_step_reward": float(rollout_reward / max(1, len(transitions))),
         "mean_shaping_reward": float(rollout_shaping_reward / max(1, len(transitions))),
+        "mean_terminal_bonus": float(rollout_terminal_bonus / max(1, len(transitions))),
         "mean_return": float(np.mean(episode_returns)) if episode_returns else float("nan"),
         "mean_score_diff": float(np.mean(episode_score_diffs)) if episode_score_diffs else float("nan"),
     }
@@ -460,8 +607,71 @@ def evaluate_many(model, device, opponent_name, seeds, max_steps, args=None):
         "mean_score_diff": float(np.mean(score_diffs)),
         "min_score_diff": int(np.min(score_diffs)),
         "max_score_diff": int(np.max(score_diffs)),
+        "win_count": int(sum(1 for score_diff in score_diffs if score_diff > 0)),
+        "num_seeds": int(len(score_diffs)),
         "mean_reward_diff": float(np.mean(reward_diffs)),
     }
+
+
+def selection_score_from_metrics(
+    eval_metrics,
+    win_opponents,
+    mean_opponents,
+    min_wins,
+    min_mean_score,
+):
+    """Rank checkpoints by the PPO-version selection gate.
+
+    A passing checkpoint must win enough seeds and clear the mean score
+    threshold against every selected opponent. If none pass yet, the closest
+    failure is still saved as a fallback so the league loop always has a best
+    checkpoint to evaluate.
+    """
+
+    win_rows = []
+    for opponent in win_opponents:
+        mean_key = f"eval_{opponent}_mean_score_diff"
+        wins_key = f"eval_{opponent}_win_count"
+        if mean_key not in eval_metrics or wins_key not in eval_metrics:
+            continue
+        win_rows.append((opponent, float(eval_metrics[mean_key]), int(eval_metrics[wins_key])))
+
+    mean_rows = []
+    for opponent in mean_opponents:
+        mean_key = f"eval_{opponent}_mean_score_diff"
+        if mean_key not in eval_metrics:
+            continue
+        mean_rows.append((opponent, float(eval_metrics[mean_key])))
+
+    if not win_rows and not mean_rows:
+        means = [
+            float(value)
+            for key, value in eval_metrics.items()
+            if key.endswith("_mean_score_diff")
+        ]
+        return (min(means) if means else -float("inf")), False, {}
+
+    if not mean_rows:
+        mean_rows = [(opponent, mean) for opponent, mean, _wins in win_rows]
+    if not win_rows:
+        win_rows = [(opponent, mean, 0) for opponent, mean in mean_rows]
+
+    mean_margin = min(mean - float(min_mean_score) for _opponent, mean in mean_rows)
+    win_margin = min(wins - int(min_wins) for _opponent, _mean, wins in win_rows)
+    passed = mean_margin >= 0.0 and win_margin >= 0
+    min_mean = min(mean for _opponent, mean in mean_rows)
+    min_wins_seen = min(wins for _opponent, _mean, wins in win_rows)
+    # Passing checkpoints rank above failing ones; within each group, prefer
+    # stronger mean score and then stronger win margin.
+    score = (1000.0 if passed else 0.0) + min_mean + 0.01 * float(min_wins_seen)
+    details = {
+        "selection_pass": passed,
+        "selection_min_mean_score": min_mean,
+        "selection_min_wins": min_wins_seen,
+        "selection_mean_margin": mean_margin,
+        "selection_win_margin": float(win_margin),
+    }
+    return float(score), passed, details
 
 
 def save_checkpoint(model, path, iteration, metrics, args):
@@ -475,7 +685,7 @@ def save_checkpoint(model, path, iteration, metrics, args):
             "feature_dim": FEATURE_DIM,
             "global_feature_dim": GLOBAL_FEATURE_DIM,
             "hidden_dim": int(args.hidden_dim),
-            "architecture": "target_selection_mlp_tanh_2x_abandon_position_rich_critic",
+            "architecture": "target_selection_mlp_tanh_2x64_cluster_control_v3",
         },
         path,
     )
@@ -542,11 +752,11 @@ def adapt_critic_input_weight(
 
 
 def adapt_checkpoint_state_dict(model, checkpoint, state_dict):
-    """Load old 23-feature checkpoints into the widened 27-feature model.
+    """Load older checkpoints into the widened 31-feature v3 model.
 
     Existing feature columns keep their learned weights. Newly appended
-    position-feature columns start at zero weight, so the run starts exactly
-    from the old policy before learning how to use the new inputs.
+    feature columns start at zero weight, so the run starts from the old policy
+    before learning how to use the new cluster-control inputs.
     """
 
     model_state = model.state_dict()
@@ -609,9 +819,32 @@ def parse_args():
     parser.add_argument("--checkpoint-path", type=Path, default=DEFAULT_CHECKPOINT)
     parser.add_argument("--best-checkpoint-path", type=Path, default=None)
     parser.add_argument("--resume-path", type=Path, default=None)
-    parser.add_argument("--self-play-checkpoint", type=Path, default=None)
+    parser.add_argument("--ppo-checkpoint", type=Path, default=DEFAULT_PPO_CHECKPOINT)
+    parser.add_argument(
+        "--position-aware-ppo-checkpoint",
+        type=Path,
+        default=DEFAULT_POSITION_AWARE_PPO_CHECKPOINT,
+    )
+    parser.add_argument(
+        "--league-checkpoints",
+        nargs="*",
+        type=Path,
+        default=[],
+        help="Frozen accepted PPO snapshots sampled when opponent name is 'league'.",
+    )
+    parser.add_argument(
+        "--league-checkpoint-weights",
+        nargs="*",
+        type=float,
+        default=[],
+        help=(
+            "Optional sampling weights for --league-checkpoints. "
+            "Used by the v3 league loop to make newer accepted snapshots "
+            "slightly more likely without dropping older ones."
+        ),
+    )
     parser.add_argument("--eval-only", action="store_true")
-    parser.add_argument("--iterations", type=int, default=20)
+    parser.add_argument("--iterations", type=int, default=30)
     parser.add_argument("--rollout-steps", type=int, default=3000)
     parser.add_argument("--ppo-epochs", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=256)
@@ -625,12 +858,13 @@ def parse_args():
     parser.add_argument("--max-grad-norm", type=float, default=0.5)
     parser.add_argument(
         "--reward-mode",
-        choices=["score_delta", "score_delta_shaped", "env_diff"],
-        default="score_delta",
+        choices=["score_delta", "score_delta_shaped", "score_delta_cluster", "env_diff"],
+        default="score_delta_cluster",
         help=(
-            "score_delta optimizes item-score changes; score_delta_shaped adds "
-            "small cluster/front-run/lost-race shaping; env_diff uses raw "
-            "environment reward difference."
+            "score_delta optimizes item-score changes; score_delta_cluster adds "
+            "focused own-favored cluster/route shaping; score_delta_shaped adds "
+            "the older broad shaping; env_diff uses raw environment reward "
+            "difference."
         ),
     )
     parser.add_argument("--shaping-cluster-bonus", type=float, default=0.02)
@@ -639,16 +873,31 @@ def parse_args():
     parser.add_argument("--shaping-lost-race-penalty", type=float, default=0.04)
     parser.add_argument("--shaping-lost-route-penalty", type=float, default=0.03)
     parser.add_argument("--shaping-max-abs", type=float, default=0.15)
+    parser.add_argument("--cluster-signal-center-bonus", type=float, default=0.08)
+    parser.add_argument("--cluster-signal-route-bonus", type=float, default=0.06)
+    parser.add_argument("--cluster-signal-control-bonus", type=float, default=0.12)
+    parser.add_argument("--cluster-signal-swing-bonus", type=float, default=0.08)
+    parser.add_argument("--cluster-signal-lost-penalty", type=float, default=0.08)
+    parser.add_argument("--singleton-tunnel-penalty", type=float, default=0.08)
+    parser.add_argument("--cluster-signal-max-abs", type=float, default=0.20)
+    parser.add_argument(
+        "--terminal-win-bonus",
+        type=float,
+        default=5.0,
+        help="Added only on the terminal transition when final score diff is positive.",
+    )
     parser.add_argument(
         "--opponent-mix",
         type=parse_opponent_mix,
-        default=parse_opponent_mix("bfs:0.4,rollout_gated:0.6"),
+        default=parse_opponent_mix(
+            "bfs:0.15,rollout_gated:0.25,ppo:0.25,position_aware_ppo:0.35"
+        ),
     )
     parser.add_argument(
         "--eval-opponents",
         nargs="+",
         choices=OPPONENT_CHOICES,
-        default=["bfs", "rollout_gated"],
+        default=["bfs", "rollout_gated", "ppo", "position_aware_ppo"],
     )
     parser.add_argument(
         "--selection-opponents",
@@ -663,6 +912,18 @@ def parse_args():
     parser.add_argument("--eval-seeds", nargs="+", type=int, default=[0, 1, 2, 3, 4])
     parser.add_argument("--eval-steps", type=int, default=1000)
     parser.add_argument("--eval-interval", type=int, default=1)
+    parser.add_argument("--selection-min-wins", type=int, default=0)
+    parser.add_argument("--selection-min-mean-score", type=float, default=-1.0e9)
+    parser.add_argument(
+        "--selection-mean-opponents",
+        nargs="+",
+        choices=OPPONENT_CHOICES,
+        default=None,
+        help=(
+            "Opponents that must clear --selection-min-mean-score. "
+            "Defaults to --selection-opponents when omitted."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -703,9 +964,10 @@ def main():
     print(
         f"target_selection_mlp device={device} resumed={resumed} "
         f"iterations={args.iterations} rollout_steps={args.rollout_steps} "
-        f"hidden_dim={args.hidden_dim} reward_mode={args.reward_mode} "
-        f"opponent_mix={args.opponent_mix} "
-        f"selection_opponents={args.selection_opponents}",
+            f"hidden_dim={args.hidden_dim} reward_mode={args.reward_mode} "
+            f"terminal_win_bonus={args.terminal_win_bonus} "
+            f"opponent_mix={args.opponent_mix} "
+            f"selection_opponents={args.selection_opponents}",
         flush=True,
     )
 
@@ -733,6 +995,7 @@ def main():
             f"episodes={rollout_metrics['episodes']} "
             f"mean_step_reward={rollout_metrics['mean_step_reward']:.3f} "
             f"mean_shaping={rollout_metrics['mean_shaping_reward']:.3f} "
+            f"mean_terminal_bonus={rollout_metrics['mean_terminal_bonus']:.4f} "
             f"rollout_return={rollout_metrics['mean_return']:.2f} "
             f"rollout_score_diff={rollout_metrics['mean_score_diff']:.2f} "
             f"loss={update_metrics['loss']:.4f} "
@@ -760,27 +1023,22 @@ def main():
                 eval_metrics[f"eval_{opponent}_min_score_diff"] = opponent_metrics[
                     "min_score_diff"
                 ]
-            if eval_metrics:
-                selection_values = [
-                    value
-                    for key, value in eval_metrics.items()
-                    if key.endswith("_mean_score_diff")
-                    and key[len("eval_"):-len("_mean_score_diff")]
-                    in set(args.selection_opponents)
+                eval_metrics[f"eval_{opponent}_win_count"] = opponent_metrics[
+                    "win_count"
                 ]
-                if not selection_values:
-                    selection_values = [
-                        value
-                        for key, value in eval_metrics.items()
-                        if key.endswith("_mean_score_diff")
-                    ]
-                eval_score = min(
-                    selection_values
+            if eval_metrics:
+                eval_score, selection_pass, selection_details = selection_score_from_metrics(
+                    eval_metrics,
+                    args.selection_opponents,
+                    args.selection_mean_opponents or args.selection_opponents,
+                    args.selection_min_wins,
+                    args.selection_min_mean_score,
                 )
                 metrics = {
                     **metrics,
                     **eval_metrics,
                     "eval_selection_score": float(eval_score),
+                    **selection_details,
                 }
                 if eval_score > best_eval_score:
                     best_eval_score = float(eval_score)
@@ -793,7 +1051,8 @@ def main():
                     )
                     print(
                         f"saved_best_checkpoint={best_checkpoint_path} "
-                        f"iteration={iteration} selection_score={best_eval_score:.2f}",
+                        f"iteration={iteration} selection_score={best_eval_score:.2f} "
+                        f"selection_pass={selection_pass}",
                         flush=True,
                     )
             save_checkpoint(model, args.checkpoint_path, iteration, metrics, args)

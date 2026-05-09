@@ -1,0 +1,88 @@
+{
+  "created_at": "2026-05-08T14:28:44",
+  "metric_opponents": [
+    "rollout_gated",
+    "position_aware_ppo"
+  ],
+  "best_cap": 0.35,
+  "best_result": {
+    "cap": 0.35,
+    "seed": 5100,
+    "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\sweep_cap035_latest.pt",
+    "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\sweep_cap035_latest_best.pt",
+    "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\sweep_cap035_train.log",
+    "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\sweep_cap035_eval.log",
+    "means": {
+      "bfs": 3.8,
+      "rollout_gated": 10.2,
+      "ppo": 5.6,
+      "position_aware_ppo": 4.2
+    },
+    "selection_tuple": [
+      4.2,
+      3.8,
+      5.95
+    ]
+  },
+  "all_results": [
+    {
+      "cap": 0.2,
+      "seed": 5000,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\sweep_cap020_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\sweep_cap020_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\sweep_cap020_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\sweep_cap020_eval.log",
+      "means": {
+        "bfs": 2.4,
+        "rollout_gated": 1.0,
+        "ppo": 4.8,
+        "position_aware_ppo": 1.4
+      },
+      "selection_tuple": [
+        1.0,
+        1.0,
+        2.4
+      ]
+    },
+    {
+      "cap": 0.35,
+      "seed": 5100,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\sweep_cap035_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\sweep_cap035_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\sweep_cap035_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\sweep_cap035_eval.log",
+      "means": {
+        "bfs": 3.8,
+        "rollout_gated": 10.2,
+        "ppo": 5.6,
+        "position_aware_ppo": 4.2
+      },
+      "selection_tuple": [
+        4.2,
+        3.8,
+        5.95
+      ]
+    },
+    {
+      "cap": 0.5,
+      "seed": 5200,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\sweep_cap050_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\sweep_cap050_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\sweep_cap050_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\training_logs\\sweep_cap050_eval.log",
+      "means": {
+        "bfs": 10.6,
+        "rollout_gated": 5.2,
+        "ppo": 4.6,
+        "position_aware_ppo": 4.0
+      },
+      "selection_tuple": [
+        4.0,
+        4.0,
+        6.1
+      ]
+    }
+  ],
+  "league_iterations": 20,
+  "league_generations": 5
+}

@@ -1,4 +1,4 @@
-"""Small target-selection policy used by PPO training and replay.
+"""Cluster-control target-selection policy used by PPO training and replay.
 
 The policy does not learn movement. It scores reachable item targets, and BFS
 turns the selected target into the first shortest-path move.
@@ -17,7 +17,7 @@ ACTION_DIM = 4
 MAP_HEIGHT = 16
 MAP_WIDTH = 16
 MAX_DISTANCE = MAP_HEIGHT + MAP_WIDTH
-FEATURE_DIM = 27
+FEATURE_DIM = 31
 GLOBAL_FEATURE_DIM = 19
 ROUTE_DEPTH = 3
 ROUTE_DECAY = 0.7
@@ -110,6 +110,11 @@ def count_cluster(item_distance_maps, target, items, radius):
     return sum(1 for item in items if distances.get(item, 10_000) <= radius)
 
 
+def nearby_cluster_items(item_distance_maps, target, items, radius):
+    distances = item_distance_maps[target]
+    return [item for item in items if distances.get(item, 10_000) <= radius]
+
+
 def route_value(target, items, item_distance_maps, depth=ROUTE_DEPTH, decay=ROUTE_DECAY):
     """Cheap feature for whether a target opens a short follow-up route."""
 
@@ -156,6 +161,83 @@ def position_features(target, cluster_value):
         float(np.clip(edge_score, 0.0, 1.0)),
         float(np.clip(center_cluster_value, 0.0, 1.0)),
         float(np.clip(edge_cluster_value, 0.0, 1.0)),
+    )
+
+
+def cluster_control_features(
+    target,
+    items,
+    item_distance_maps,
+    own_distances,
+    opponent_distances,
+    own_distance,
+    opponent_distance,
+    cluster_value,
+    contested,
+):
+    """Estimate whether this target controls a local item region.
+
+    This is deliberately cheap: use the BFS-radius-5 neighborhood around the
+    target as the local cluster, then count how many items in that neighborhood
+    our agent can reach no later than the opponent.
+    """
+
+    cluster_items = nearby_cluster_items(item_distance_maps, target, items, radius=5)
+    if not cluster_items:
+        return 0.0, 0.0, 0.0, 0.0
+
+    controlled = 0
+    margins = []
+    own_sum = 0.0
+    opponent_sum = 0.0
+    for item in cluster_items:
+        own_item_distance = own_distances.get(item, MAX_DISTANCE)
+        opponent_item_distance = opponent_distances.get(item, MAX_DISTANCE)
+        own_sum += float(own_item_distance)
+        opponent_sum += float(opponent_item_distance)
+        margin = float(opponent_item_distance - own_item_distance)
+        margins.append(margin)
+        if margin >= 0.0:
+            controlled += 1
+
+    cluster_size = max(1, len(cluster_items))
+    cluster_control_value = min(float(controlled), 10.0) / 10.0
+    cluster_race_margin = float(
+        np.clip(np.mean(margins) / MAX_DISTANCE, -1.0, 1.0)
+    )
+    own_cluster_distance = own_sum / float(cluster_size)
+    opponent_cluster_distance = opponent_sum / float(cluster_size)
+    cluster_distance_margin = float(
+        np.clip(
+            (opponent_cluster_distance - own_cluster_distance) / MAX_DISTANCE,
+            -1.0,
+            1.0,
+        )
+    )
+
+    opponent_distance_feature = (
+        opponent_distance if opponent_distance is not None else MAX_DISTANCE
+    )
+    immediate_margin = float(opponent_distance_feature - own_distance)
+    singleton_tunnel_flag = (
+        1.0
+        if contested >= 1.0
+        and cluster_value < 0.25
+        and abs(immediate_margin) <= 1.0
+        else 0.0
+    )
+    cluster_swing_value = float(
+        np.clip(
+            cluster_control_value - 0.5 * singleton_tunnel_flag,
+            -1.0,
+            1.0,
+        )
+    )
+    return (
+        float(np.clip(cluster_control_value, 0.0, 1.0)),
+        cluster_race_margin,
+        singleton_tunnel_flag,
+        cluster_swing_value,
     )
 
 
@@ -272,6 +354,22 @@ def build_target_candidates(observation):
         contested = 1.0 if abs(race_margin) <= 2.0 else 0.0
         own_favored = 1.0 if race_margin >= 0.0 else 0.0
         lost_race = 1.0 if race_margin < -1.0 else 0.0
+        (
+            cluster_control_value,
+            cluster_race_margin,
+            singleton_tunnel_flag,
+            cluster_swing_value,
+        ) = cluster_control_features(
+            target=item,
+            items=items,
+            item_distance_maps=item_distance_maps,
+            own_distances=own_distances,
+            opponent_distances=opponent_distances,
+            own_distance=own_distance,
+            opponent_distance=opponent_distance,
+            cluster_value=cluster_value,
+            contested=contested,
+        )
         route_if_own_favored = local_route_value * own_favored
         route_if_lost = local_route_value * lost_race
         abandon_pressure = lost_race * (0.5 + 0.5 * behind)
@@ -310,6 +408,10 @@ def build_target_candidates(observation):
             edge_score,
             center_cluster_value,
             edge_cluster_value,
+            cluster_control_value,
+            cluster_race_margin,
+            singleton_tunnel_flag,
+            cluster_swing_value,
         ]
         features.append(row)
         targets.append(item)
