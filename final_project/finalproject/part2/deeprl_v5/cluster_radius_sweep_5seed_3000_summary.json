@@ -1,0 +1,434 @@
+{
+  "resume_path": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v3\\checkpoints\\ppo_league_gen5.pt",
+  "iterations": 1,
+  "rollout_steps": 3000,
+  "train_eval_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "eval_seeds": [
+    1000,
+    1001,
+    1002,
+    1003,
+    1004
+  ],
+  "eval_opponents": [
+    "rollout_gated",
+    "position_aware_ppo"
+  ],
+  "metric_opponents": [
+    "rollout_gated",
+    "position_aware_ppo"
+  ],
+  "results": [
+    {
+      "local_radius": 3,
+      "large_radius": 5,
+      "seed": 9000,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g5_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g5_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g5_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g5_eval.log",
+      "means": {
+        "rollout_gated": 11.0,
+        "position_aware_ppo": 3.2
+      },
+      "mins": {
+        "rollout_gated": 6,
+        "position_aware_ppo": -6
+      },
+      "maxs": {
+        "rollout_gated": 20,
+        "position_aware_ppo": 10
+      },
+      "wins": {
+        "rollout_gated": 5,
+        "position_aware_ppo": 3
+      },
+      "selection_tuple": [
+        3.2,
+        3.2,
+        7.1,
+        3
+      ]
+    },
+    {
+      "local_radius": 3,
+      "large_radius": 6,
+      "seed": 9100,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g6_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g6_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g6_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g6_eval.log",
+      "means": {
+        "rollout_gated": 8.2,
+        "position_aware_ppo": 12.2
+      },
+      "mins": {
+        "rollout_gated": 3,
+        "position_aware_ppo": 2
+      },
+      "maxs": {
+        "rollout_gated": 17,
+        "position_aware_ppo": 25
+      },
+      "wins": {
+        "rollout_gated": 5,
+        "position_aware_ppo": 5
+      },
+      "selection_tuple": [
+        8.2,
+        8.2,
+        10.2,
+        5
+      ]
+    },
+    {
+      "local_radius": 3,
+      "large_radius": 7,
+      "seed": 9200,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g7_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g7_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g7_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g7_eval.log",
+      "means": {
+        "rollout_gated": 13.2,
+        "position_aware_ppo": 3.4
+      },
+      "mins": {
+        "rollout_gated": 5,
+        "position_aware_ppo": -4
+      },
+      "maxs": {
+        "rollout_gated": 20,
+        "position_aware_ppo": 14
+      },
+      "wins": {
+        "rollout_gated": 5,
+        "position_aware_ppo": 3
+      },
+      "selection_tuple": [
+        3.4,
+        3.4,
+        8.299999999999999,
+        3
+      ]
+    },
+    {
+      "local_radius": 4,
+      "large_radius": 5,
+      "seed": 9300,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g5_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g5_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g5_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g5_eval.log",
+      "means": {
+        "rollout_gated": 9.6,
+        "position_aware_ppo": 5.0
+      },
+      "mins": {
+        "rollout_gated": -2,
+        "position_aware_ppo": -1
+      },
+      "maxs": {
+        "rollout_gated": 19,
+        "position_aware_ppo": 21
+      },
+      "wins": {
+        "rollout_gated": 4,
+        "position_aware_ppo": 3
+      },
+      "selection_tuple": [
+        5.0,
+        5.0,
+        7.3,
+        3
+      ]
+    },
+    {
+      "local_radius": 4,
+      "large_radius": 6,
+      "seed": 9400,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g6_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g6_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g6_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g6_eval.log",
+      "means": {
+        "rollout_gated": 7.0,
+        "position_aware_ppo": 7.0
+      },
+      "mins": {
+        "rollout_gated": 0,
+        "position_aware_ppo": -1
+      },
+      "maxs": {
+        "rollout_gated": 13,
+        "position_aware_ppo": 16
+      },
+      "wins": {
+        "rollout_gated": 4,
+        "position_aware_ppo": 3
+      },
+      "selection_tuple": [
+        7.0,
+        7.0,
+        7.0,
+        3
+      ]
+    },
+    {
+      "local_radius": 4,
+      "large_radius": 7,
+      "seed": 9500,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g7_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g7_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g7_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g7_eval.log",
+      "means": {
+        "rollout_gated": 9.4,
+        "position_aware_ppo": 4.4
+      },
+      "mins": {
+        "rollout_gated": 1,
+        "position_aware_ppo": 0
+      },
+      "maxs": {
+        "rollout_gated": 17,
+        "position_aware_ppo": 15
+      },
+      "wins": {
+        "rollout_gated": 5,
+        "position_aware_ppo": 4
+      },
+      "selection_tuple": [
+        4.4,
+        4.4,
+        6.9,
+        4
+      ]
+    }
+  ],
+  "ranked": [
+    {
+      "local_radius": 3,
+      "large_radius": 6,
+      "seed": 9100,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g6_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g6_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g6_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g6_eval.log",
+      "means": {
+        "rollout_gated": 8.2,
+        "position_aware_ppo": 12.2
+      },
+      "mins": {
+        "rollout_gated": 3,
+        "position_aware_ppo": 2
+      },
+      "maxs": {
+        "rollout_gated": 17,
+        "position_aware_ppo": 25
+      },
+      "wins": {
+        "rollout_gated": 5,
+        "position_aware_ppo": 5
+      },
+      "selection_tuple": [
+        8.2,
+        8.2,
+        10.2,
+        5
+      ]
+    },
+    {
+      "local_radius": 4,
+      "large_radius": 6,
+      "seed": 9400,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g6_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g6_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g6_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g6_eval.log",
+      "means": {
+        "rollout_gated": 7.0,
+        "position_aware_ppo": 7.0
+      },
+      "mins": {
+        "rollout_gated": 0,
+        "position_aware_ppo": -1
+      },
+      "maxs": {
+        "rollout_gated": 13,
+        "position_aware_ppo": 16
+      },
+      "wins": {
+        "rollout_gated": 4,
+        "position_aware_ppo": 3
+      },
+      "selection_tuple": [
+        7.0,
+        7.0,
+        7.0,
+        3
+      ]
+    },
+    {
+      "local_radius": 4,
+      "large_radius": 5,
+      "seed": 9300,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g5_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g5_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g5_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g5_eval.log",
+      "means": {
+        "rollout_gated": 9.6,
+        "position_aware_ppo": 5.0
+      },
+      "mins": {
+        "rollout_gated": -2,
+        "position_aware_ppo": -1
+      },
+      "maxs": {
+        "rollout_gated": 19,
+        "position_aware_ppo": 21
+      },
+      "wins": {
+        "rollout_gated": 4,
+        "position_aware_ppo": 3
+      },
+      "selection_tuple": [
+        5.0,
+        5.0,
+        7.3,
+        3
+      ]
+    },
+    {
+      "local_radius": 4,
+      "large_radius": 7,
+      "seed": 9500,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g7_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l4_g7_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g7_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l4_g7_eval.log",
+      "means": {
+        "rollout_gated": 9.4,
+        "position_aware_ppo": 4.4
+      },
+      "mins": {
+        "rollout_gated": 1,
+        "position_aware_ppo": 0
+      },
+      "maxs": {
+        "rollout_gated": 17,
+        "position_aware_ppo": 15
+      },
+      "wins": {
+        "rollout_gated": 5,
+        "position_aware_ppo": 4
+      },
+      "selection_tuple": [
+        4.4,
+        4.4,
+        6.9,
+        4
+      ]
+    },
+    {
+      "local_radius": 3,
+      "large_radius": 7,
+      "seed": 9200,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g7_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g7_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g7_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g7_eval.log",
+      "means": {
+        "rollout_gated": 13.2,
+        "position_aware_ppo": 3.4
+      },
+      "mins": {
+        "rollout_gated": 5,
+        "position_aware_ppo": -4
+      },
+      "maxs": {
+        "rollout_gated": 20,
+        "position_aware_ppo": 14
+      },
+      "wins": {
+        "rollout_gated": 5,
+        "position_aware_ppo": 3
+      },
+      "selection_tuple": [
+        3.4,
+        3.4,
+        8.299999999999999,
+        3
+      ]
+    },
+    {
+      "local_radius": 3,
+      "large_radius": 5,
+      "seed": 9000,
+      "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g5_latest.pt",
+      "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g5_latest_best.pt",
+      "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g5_train.log",
+      "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g5_eval.log",
+      "means": {
+        "rollout_gated": 11.0,
+        "position_aware_ppo": 3.2
+      },
+      "mins": {
+        "rollout_gated": 6,
+        "position_aware_ppo": -6
+      },
+      "maxs": {
+        "rollout_gated": 20,
+        "position_aware_ppo": 10
+      },
+      "wins": {
+        "rollout_gated": 5,
+        "position_aware_ppo": 3
+      },
+      "selection_tuple": [
+        3.2,
+        3.2,
+        7.1,
+        3
+      ]
+    }
+  ],
+  "best": {
+    "local_radius": 3,
+    "large_radius": 6,
+    "seed": 9100,
+    "checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g6_latest.pt",
+    "best_checkpoint": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\checkpoints\\sweep_radius_5seed_3000_l3_g6_latest_best.pt",
+    "train_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g6_train.log",
+    "eval_log": "C:\\pythonlek\\8sem\\Reinforcement-Learning-\\final_project\\finalproject\\part2\\deeprl_v5\\training_logs\\sweep_radius_5seed_3000_l3_g6_eval.log",
+    "means": {
+      "rollout_gated": 8.2,
+      "position_aware_ppo": 12.2
+    },
+    "mins": {
+      "rollout_gated": 3,
+      "position_aware_ppo": 2
+    },
+    "maxs": {
+      "rollout_gated": 17,
+      "position_aware_ppo": 25
+    },
+    "wins": {
+      "rollout_gated": 5,
+      "position_aware_ppo": 5
+    },
+    "selection_tuple": [
+      8.2,
+      8.2,
+      10.2,
+      5
+    ]
+  }
+}
